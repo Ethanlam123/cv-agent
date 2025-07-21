@@ -40,7 +40,7 @@ Input CV -> Parse Document -> Analyze Content -> Match Requirements -> Generate 
 1. Clone and setup:
 
 ```bash
-cd AIAPP
+cd cv-agent
 cp .env.example .env
 # Edit .env with your API keys
 ```
