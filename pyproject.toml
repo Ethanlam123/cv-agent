@@ -1,0 +1,19 @@
+[project]
+name = "aiapp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=0.3.26",
+    "langchain-anthropic>=0.3.17",
+    "langchain-google-vertexai>=2.0.27",
+    "langchain-openai>=0.3.28",
+    "langgraph>=0.5.3",
+    "langsmith>=0.2.0",
+    "python-dotenv>=1.1.1",
+    "PyPDF2>=3.0.1",
+    "python-docx>=1.1.2",
+    "pydantic>=2.8.2",
+    "typing-extensions>=4.12.2",
+]
