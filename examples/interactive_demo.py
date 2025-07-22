@@ -52,7 +52,7 @@ def main():
         enhancement_summary=None,
         processing_errors=[],
         processing_time=1.2,
-        model_used="gpt-4o"
+        model_used="gpt-4.1-mini"
     )
     
     # Initialize interaction manager

@@ -109,7 +109,7 @@ class DocumentParser:
         
         try:
             # Initialize LLM
-            llm = init_chat_model("gpt-4o-mini", temperature=0.1)
+            llm = init_chat_model("gpt-4.1-mini", temperature=0.1)
             
             # Set up output parser
             parser = PydanticOutputParser(pydantic_object=CVSectionStructure)

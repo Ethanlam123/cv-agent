@@ -172,7 +172,7 @@ def main():
                     enhancement_summary=result.get("enhancement_summary"),
                     processing_errors=result.get("processing_errors", []),
                     processing_time=result.get("processing_time"),
-                    model_used=result.get("model_used", "gpt-4o")
+                    model_used=result.get("model_used", "gpt-4.1-mini")
                 )
                 
                 # Run interactive session

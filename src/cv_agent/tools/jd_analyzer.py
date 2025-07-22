@@ -31,7 +31,7 @@ class JDAnalysis(BaseModel):
 class JobDescriptionAnalyzer:
     """Analyzes job descriptions and matches them against CVs."""
     
-    def __init__(self, model_name: str = "gpt-4o-mini"):
+    def __init__(self, model_name: str = "gpt-4.1-mini"):
         """Initialize with specified LLM model."""
         self.model_name = model_name
     

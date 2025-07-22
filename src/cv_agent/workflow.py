@@ -126,7 +126,7 @@ class CVImprovementAgent:
             enhancement_summary=None,
             processing_errors=[],
             processing_time=None,
-            model_used="gpt-4o"
+            model_used="gpt-4.1-mini"
         )
         
         # Run the workflow

@@ -7,7 +7,7 @@ from ..models.state import CVState, Improvement
 class ImprovementGenerator:
     """Generates targeted CV improvements using LLM."""
     
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = "gpt-4.1-mini"):
         self.model = init_chat_model(
             model=model_name,
             temperature=0.3,
