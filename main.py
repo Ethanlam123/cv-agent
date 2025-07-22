@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from cv_agent.workflow import CVImprovementAgent
 from cv_agent.utils.monitoring import setup_langsmith_env
+from cv_agent.tools.user_interaction import UserInteractionManager
 
 # Load environment variables
 load_dotenv()
@@ -76,6 +77,9 @@ def main():
     # Get target role and industry (optional)
     target_role = input("\n🎯 Target role (optional): ").strip() or None
     target_industry = input("🏢 Target industry (optional): ").strip() or None
+    
+    # Ask for interaction mode
+    interaction_mode = input("\n💬 Use interactive mode for personalized suggestions? (y/n): ").lower().strip() == 'y'
     
     # Process the CV
     print(f"\n⚙️  Processing CV...")
@@ -141,6 +145,58 @@ def main():
                     with open(output_path, 'w', encoding='utf-8') as f:
                         f.write(result["enhanced_cv"])
                     print(f"✅ Enhanced CV saved to: {output_path}")
+        
+        # Interactive user suggestions (if enabled)
+        if interaction_mode:
+            print("\n" + "=" * 50)
+            print("💬 INTERACTIVE SUGGESTIONS")
+            print("=" * 50)
+            
+            try:
+                interaction_manager = UserInteractionManager()
+                
+                # Create a minimal state for interaction
+                from cv_agent.models.state import CVState
+                interaction_state = CVState(
+                    original_cv=cv_content,
+                    file_format=result.get("file_format", "unknown"),
+                    target_role=target_role,
+                    target_industry=target_industry,
+                    parsed_sections=result.get("parsed_sections", {}),
+                    raw_text=result.get("raw_text", ""),
+                    analysis_scores=result.get("analysis_scores"),
+                    identified_gaps=result.get("identified_gaps", []),
+                    suggested_improvements=result.get("suggested_improvements", []),
+                    applied_improvements=result.get("applied_improvements", []),
+                    enhanced_cv=result.get("enhanced_cv"),
+                    enhancement_summary=result.get("enhancement_summary"),
+                    processing_errors=result.get("processing_errors", []),
+                    processing_time=result.get("processing_time"),
+                    model_used=result.get("model_used", "gpt-4o")
+                )
+                
+                # Run interactive session
+                interactive_result = interaction_manager.interactive_improvement_session(interaction_state)
+                
+                # Show personalized suggestions
+                personalized_suggestions = interactive_result.get("personalized_suggestions", [])
+                if personalized_suggestions:
+                    print(f"\n✨ Based on your responses, here are {len(personalized_suggestions)} personalized suggestions:")
+                    for i, suggestion in enumerate(personalized_suggestions, 1):
+                        priority_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+                        emoji = priority_emoji.get(suggestion.get("priority", "medium"), "🔵")
+                        print(f"\n{i}. {emoji} **{suggestion.get('title', 'Suggestion')}**")
+                        print(f"   Why: {suggestion.get('reason', 'Improves CV quality')}")
+                        print(f"   Action: {suggestion.get('action', 'Make improvements')}")
+                        print(f"   Impact: {suggestion.get('impact', 'Positive results expected')}")
+                
+                print(f"\n💬 Interactive session completed!")
+                
+            except KeyboardInterrupt:
+                print(f"\n👋 Interactive session cancelled by user")
+            except Exception as interactive_error:
+                print(f"\n⚠️  Interactive session failed: {str(interactive_error)}")
+                print("Continuing with standard analysis results...")
         
         print(f"\n🎉 CV analysis completed successfully!")
         
