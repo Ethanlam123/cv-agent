@@ -9,7 +9,7 @@ from ..tools.parsers import ParserFactory
 def parse_cv_node(state: CVState) -> Dict[str, Any]:
     """
     LangGraph node for parsing CV documents and extracting structured content.
-    Enhanced with Docling parser for better document understanding.
+    Enhanced with Docling parser and LLM-based section extraction for superior document understanding.
     
     Args:
         state: Current CVState containing the original CV path or content
@@ -29,14 +29,15 @@ def parse_cv_node(state: CVState) -> Dict[str, Any]:
             suffix = Path(file_path).suffix.lower()
             file_format = suffix[1:] if suffix else "unknown"
             
-            # Create appropriate parser with Docling enabled by default
+            # Create appropriate parser with Docling and LLM enabled by default
             use_docling = True
+            use_llm = True
             try:
-                parser = ParserFactory.create_parser(file_path, use_docling=use_docling)
+                parser = ParserFactory.create_parser(file_path, use_docling=use_docling, use_llm=use_llm)
             except ImportError:
                 # Fallback to traditional parsers if Docling is not available
                 print("Warning: Docling not available, falling back to traditional parsers")
-                parser = ParserFactory.create_parser(file_path, use_docling=False)
+                parser = ParserFactory.create_parser(file_path, use_docling=False, use_llm=use_llm)
             
             # Parse the document
             raw_text = parser.parse(file_path)
@@ -47,15 +48,19 @@ def parse_cv_node(state: CVState) -> Dict[str, Any]:
             raw_text = state["original_cv"]
             file_format = "txt"
             
-            # Use text parser for section extraction (no Docling needed for raw text)
-            parser = ParserFactory.create_parser("dummy.txt", use_docling=False)
+            # Use text parser with LLM for section extraction
+            use_llm = True
+            parser = ParserFactory.create_parser("dummy.txt", use_docling=False, use_llm=use_llm)
             parsed_sections = parser.extract_sections(raw_text)
         
         processing_time = time.time() - start_time
         
         # Log parsing success
-        parser_type = "Docling" if hasattr(parser, 'converter') else "Traditional"
+        parser_type = "Docling+LLM" if hasattr(parser, 'converter') and hasattr(parser, 'use_llm') and parser.use_llm else \
+                     "Docling" if hasattr(parser, 'converter') else \
+                     "LLM-Enhanced" if hasattr(parser, 'llm_parser') else "Traditional"
         print(f"CV parsed successfully using {parser_type} parser in {processing_time:.2f}s")
+        print(f"Extracted {len(parsed_sections)} sections: {list(parsed_sections.keys())}")
         
         return {
             **state,
@@ -75,7 +80,7 @@ def parse_cv_node(state: CVState) -> Dict[str, Any]:
             try:
                 print("Docling parsing failed, attempting fallback to traditional parsers...")
                 file_path = state["original_cv"]
-                parser = ParserFactory.create_parser(file_path, use_docling=False)
+                parser = ParserFactory.create_parser(file_path, use_docling=False, use_llm=True)  # Still use LLM if available
                 raw_text = parser.parse(file_path)
                 parsed_sections = parser.extract_sections(raw_text)
                 

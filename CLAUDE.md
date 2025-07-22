@@ -46,19 +46,51 @@ This is a LangGraph-based CV improvement agent that processes CVs through a mult
 - State flows through nodes, accumulating analysis results and improvements
 
 ### Node Structure (src/cv_agent/nodes/)
-- **parsing.py**: Document parsing (PDF/DOCX/text) � structured sections
+- **parsing.py**: Document parsing (PDF/DOCX/text) � structured sections with LLM enhancement
 - **analysis.py**: Quality scoring and requirement matching
 - **improvement.py**: LLM-powered enhancement generation and application
 
 ### Tools (src/cv_agent/tools/)
 - **analyzers.py**: CV scoring algorithms and ATS compatibility checks
-- **parsers.py**: File format handlers (PDF, DOCX, text)
+- **parsers.py**: Multi-tiered parsing system (LLM � Docling � Traditional)
 
 ### Dependencies
 - **LangGraph**: Workflow orchestration
 - **LangSmith**: Optional monitoring and tracing  
 - **LangChain**: LLM integrations (OpenAI/Anthropic/Google)
-- **PyPDF2/python-docx**: Document parsing
+- **Docling**: Advanced document parsing with OCR and structure detection
+- **PyPDF2/python-docx**: Traditional document parsing fallbacks
+
+### LLM-Enhanced Section Parsing
+The system uses a three-tier parsing approach for maximum accuracy:
+
+1. **LLM Parsing (Primary)**: Uses GPT-4o-mini with structured output to intelligently identify CV sections
+   - Handles non-standard section names (e.g., "Professional Journey" → "experience")  
+   - Better understanding of context and content grouping
+   - Higher confidence scores for accurately identified sections
+   - Graceful fallback when API keys unavailable
+
+2. **Docling Parsing (Secondary)**: Advanced document processing with markdown structure
+   - OCR capabilities for scanned documents
+   - Table and layout structure preservation
+   - Enhanced markdown-based section detection
+
+3. **Traditional Parsing (Fallback)**: Regex-based pattern matching
+   - Reliable baseline with standard CV section patterns
+   - No external dependencies required
+
+**Usage Examples:**
+```python
+# Enable both LLM and Docling (default)
+parser = ParserFactory.create_parser("cv.pdf", use_docling=True, use_llm=True)
+
+# Traditional parsing only  
+parser = ParserFactory.create_parser("cv.pdf", use_docling=False, use_llm=False)
+
+# LLM-only for text
+llm_parser = ParserFactory.create_llm_parser()
+sections = llm_parser.extract_sections(cv_text)
+```
 
 ## Documentation and Research
 

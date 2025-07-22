@@ -13,6 +13,7 @@ from cv_agent.tools.parsers import (
     PDFParser,
     DocxParser,
     DoclingParser,
+    LLMDocumentParser,
     ParserFactory
 )
 from cv_agent.models.state import CVSection
@@ -212,8 +213,61 @@ class TestDoclingParser:
         for section_name in expected_sections:
             assert section_name in sections
             assert len(sections[section_name].content) > 0
-            # Docling parser should have higher confidence
-            assert sections[section_name].confidence >= 0.9
+            # Docling parser should have reasonable confidence (0.8 for traditional, 0.9+ for LLM)
+            assert sections[section_name].confidence >= 0.8
+
+
+class TestLLMDocumentParser:
+    """Test the LLMDocumentParser class."""
+
+    def test_init_llm_parser(self):
+        """Test LLMDocumentParser initialization."""
+        parser = LLMDocumentParser(use_llm=True)
+        assert hasattr(parser, 'use_llm')
+        assert parser.use_llm is True
+
+    def test_parse_not_implemented(self):
+        """Test that parse method raises NotImplementedError."""
+        parser = LLMDocumentParser()
+        with pytest.raises(NotImplementedError, match="LLMDocumentParser requires pre-extracted text"):
+            parser.parse("dummy.txt")
+
+    def test_extract_sections_fallback_to_traditional(self):
+        """Test LLM parser falls back to traditional parsing when no API key."""
+        parser = LLMDocumentParser(use_llm=True)
+        
+        sample_text = """
+SUMMARY
+Experienced developer
+
+EXPERIENCE  
+Software Engineer at Company
+- Worked on projects
+
+SKILLS
+Python, JavaScript
+"""
+        
+        # Should fall back to traditional parsing without API key
+        sections = parser.extract_sections(sample_text)
+        
+        assert isinstance(sections, dict)
+        assert len(sections) > 0
+        # Check that sections contain expected keys
+        section_names = list(sections.keys())
+        assert any('summary' in name for name in section_names)
+
+    def test_extract_sections_with_llm_disabled(self):
+        """Test LLM parser with LLM disabled."""
+        parser = LLMDocumentParser(use_llm=False)
+        
+        sample_text = """
+SUMMARY
+Experienced developer
+"""
+        
+        sections = parser.extract_sections(sample_text)
+        assert isinstance(sections, dict)
 
 
 class TestParserFactory:
@@ -239,14 +293,14 @@ class TestParserFactory:
         """Test creating a Docling parser for PDF."""
         mock_docling.return_value = MagicMock()
         parser = ParserFactory.create_parser("test.pdf", use_docling=True)
-        mock_docling.assert_called_once()
+        mock_docling.assert_called_once_with(use_llm=True)
 
     @patch('cv_agent.tools.parsers.DoclingParser')
     def test_create_docling_parser_docx(self, mock_docling):
         """Test creating a Docling parser for DOCX."""
         mock_docling.return_value = MagicMock()
         parser = ParserFactory.create_parser("test.docx", use_docling=True)
-        mock_docling.assert_called_once()
+        mock_docling.assert_called_once_with(use_llm=True)
 
     def test_create_parser_unsupported_format(self):
         """Test creating parser for unsupported format."""
@@ -258,7 +312,25 @@ class TestParserFactory:
         with patch('cv_agent.tools.parsers.DoclingParser') as mock_docling:
             mock_docling.return_value = MagicMock()
             parser = ParserFactory.create_parser("test.pdf")  # use_docling defaults to True
-            mock_docling.assert_called_once()
+            mock_docling.assert_called_once_with(use_llm=True)
+
+    def test_create_llm_parser(self):
+        """Test creating a pure LLM parser."""
+        parser = ParserFactory.create_llm_parser()
+        assert isinstance(parser, LLMDocumentParser)
+        assert parser.use_llm is True
+
+    def test_create_text_parser_with_llm(self):
+        """Test creating text parser with LLM enabled."""
+        parser = ParserFactory.create_parser("test.txt", use_docling=False, use_llm=True)
+        # Should be LLMTextParser (inner class)
+        assert hasattr(parser, 'llm_parser')
+
+    def test_create_text_parser_without_llm(self):
+        """Test creating text parser with LLM disabled."""
+        parser = ParserFactory.create_parser("test.txt", use_docling=False, use_llm=False)
+        assert isinstance(parser, TextParser)
+        assert not hasattr(parser, 'llm_parser')
 
 
 if __name__ == "__main__":

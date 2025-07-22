@@ -1,13 +1,32 @@
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from pathlib import Path
 import PyPDF2
 from docx import Document
 from docling.document_converter import DocumentConverter
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PipelineOptions
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
 
 from ..models.state import CVSection
+
+
+class ParsedSection(BaseModel):
+    """Pydantic model for LLM-parsed CV sections."""
+    name: str = Field(..., description="Section name (e.g., 'summary', 'experience', 'skills')")
+    content: str = Field(..., description="Full content of the section")
+    confidence: float = Field(..., description="Confidence score between 0 and 1")
+    section_type: str = Field(..., description="Type classification (header, content, list, etc.)")
+
+
+class CVSectionStructure(BaseModel):
+    """Pydantic model for complete CV section structure."""
+    sections: List[ParsedSection] = Field(..., description="List of identified CV sections")
+    document_type: str = Field(..., description="Type of document (resume, cv, portfolio, etc.)")
+    overall_confidence: float = Field(..., description="Overall parsing confidence")
 
 
 class DocumentParser:
@@ -18,7 +37,7 @@ class DocumentParser:
         raise NotImplementedError
     
     def extract_sections(self, text: str) -> Dict[str, CVSection]:
-        """Extract structured sections from text."""
+        """Extract structured sections from text using traditional regex patterns."""
         sections = {}
         
         # Common CV section patterns
@@ -79,6 +98,77 @@ class DocumentParser:
             )
         
         return sections
+    
+    def extract_sections_with_llm(self, text: str, use_llm: bool = True) -> Dict[str, CVSection]:
+        """
+        Extract structured sections from text using LLM for intelligent parsing.
+        Falls back to traditional regex parsing if LLM is unavailable.
+        """
+        if not use_llm:
+            return self.extract_sections(text)
+        
+        try:
+            # Initialize LLM
+            llm = init_chat_model("gpt-4o-mini", temperature=0.1)
+            
+            # Set up output parser
+            parser = PydanticOutputParser(pydantic_object=CVSectionStructure)
+            
+            # Create prompt for section identification
+            system_prompt = """You are an expert CV/Resume parser. Your task is to analyze the given CV text and identify distinct sections with high accuracy.
+
+Common CV sections include:
+- contact: Contact information (name, email, phone, address)
+- summary: Professional summary, objective, or about section
+- experience: Work experience, employment history, professional experience
+- education: Educational background, academic qualifications
+- skills: Technical skills, core competencies, skill sets
+- projects: Key projects, portfolio items
+- certifications: Certifications, licenses, professional credentials
+- achievements: Awards, accomplishments, honors
+- languages: Language skills, linguistic abilities
+- references: References, referees
+
+For each section you identify:
+1. Classify it with the most appropriate section name
+2. Extract the complete content including headers
+3. Assign a confidence score (0-1) based on how certain you are
+4. Specify the section type (header, content, list, etc.)
+
+Be precise and thorough. If content doesn't clearly fit a standard section, use descriptive names."""
+
+            human_prompt = f"""Please parse the following CV text and identify all sections:
+
+{text}
+
+{parser.get_format_instructions()}"""
+
+            # Create messages
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=human_prompt)
+            ]
+            
+            # Get LLM response
+            response = llm.invoke(messages)
+            parsed_structure = parser.parse(response.content)
+            
+            # Convert to CVSection format
+            sections = {}
+            for i, section in enumerate(parsed_structure.sections):
+                sections[section.name.lower()] = CVSection(
+                    name=section.name.lower(),
+                    content=section.content,
+                    position=i,
+                    confidence=section.confidence
+                )
+            
+            return sections
+            
+        except Exception as e:
+            print(f"LLM section parsing failed: {str(e)}, falling back to traditional parsing")
+            # Call traditional parsing method directly to avoid recursion
+            return DocumentParser.extract_sections(self, text)
 
 
 class PDFParser(DocumentParser):
@@ -124,13 +214,34 @@ class TextParser(DocumentParser):
             raise ValueError(f"Error parsing text file: {str(e)}")
 
 
-class DoclingParser(DocumentParser):
-    """Advanced document parser using Docling library."""
+class LLMDocumentParser(DocumentParser):
+    """Document parser that uses LLM for intelligent section extraction."""
     
-    def __init__(self):
-        """Initialize Docling converter with optimized settings for CV parsing."""
+    def __init__(self, use_llm: bool = True):
+        """Initialize LLM parser."""
+        self.use_llm = use_llm
+    
+    def parse(self, file_path: str) -> str:
+        """This parser works with pre-extracted text."""
+        raise NotImplementedError("LLMDocumentParser requires pre-extracted text")
+    
+    def extract_sections(self, text: str) -> Dict[str, CVSection]:
+        """Extract sections using LLM for intelligent parsing."""
+        if self.use_llm:
+            return self.extract_sections_with_llm(text, use_llm=True)
+        else:
+            # Use traditional parsing when LLM is disabled
+            return DocumentParser.extract_sections(self, text)
+
+
+class DoclingParser(DocumentParser):
+    """Advanced document parser using Docling library with optional LLM section parsing."""
+    
+    def __init__(self, use_llm: bool = True):
+        """Initialize Docling converter with optional LLM section parsing."""
         # Initialize with default configuration - Docling has good defaults for CV parsing
         self.converter = DocumentConverter()
+        self.use_llm = use_llm
     
     def parse(self, file_path: str) -> str:
         """Extract text from document using Docling."""
@@ -148,8 +259,16 @@ class DoclingParser(DocumentParser):
     def extract_sections(self, text: str) -> Dict[str, CVSection]:
         """
         Enhanced section extraction using Docling's structured output.
-        Leverages markdown formatting for better section detection.
+        Uses LLM if enabled, otherwise falls back to markdown pattern matching.
         """
+        if self.use_llm:
+            try:
+                return self.extract_sections_with_llm(text, use_llm=True)
+            except Exception as e:
+                print(f"LLM parsing failed in DoclingParser: {str(e)}, using traditional markdown parsing")
+                # Continue to traditional markdown parsing below
+        
+        # Traditional markdown-based parsing as fallback
         sections = {}
         
         # Enhanced CV section patterns that work with markdown
@@ -226,19 +345,20 @@ class ParserFactory:
     """Factory for creating appropriate parsers based on file extension."""
     
     @staticmethod
-    def create_parser(file_path: str, use_docling: bool = True) -> DocumentParser:
+    def create_parser(file_path: str, use_docling: bool = True, use_llm: bool = True) -> DocumentParser:
         """
         Create parser based on file extension.
         
         Args:
             file_path: Path to the document
             use_docling: Whether to use Docling parser for supported formats
+            use_llm: Whether to use LLM for section extraction
         """
         suffix = Path(file_path).suffix.lower()
         
         # Use Docling for supported formats when available
         if use_docling and suffix in ['.pdf', '.docx', '.doc']:
-            return DoclingParser()
+            return DoclingParser(use_llm=use_llm)
         
         # Fallback to traditional parsers
         if suffix == '.pdf':
@@ -246,6 +366,25 @@ class ParserFactory:
         elif suffix in ['.docx', '.doc']:
             return DocxParser()
         elif suffix == '.txt':
-            return TextParser()
+            # For text files, we can use LLM parsing if requested
+            if use_llm:
+                # Create a composite parser that uses TextParser for file reading
+                # and LLMDocumentParser for section extraction
+                class LLMTextParser(TextParser):
+                    def __init__(self):
+                        super().__init__()
+                        self.llm_parser = LLMDocumentParser(use_llm=True)
+                    
+                    def extract_sections(self, text: str) -> Dict[str, CVSection]:
+                        return self.llm_parser.extract_sections(text)
+                
+                return LLMTextParser()
+            else:
+                return TextParser()
         else:
             raise ValueError(f"Unsupported file format: {suffix}")
+    
+    @staticmethod
+    def create_llm_parser() -> LLMDocumentParser:
+        """Create a pure LLM parser for text that's already extracted."""
+        return LLMDocumentParser(use_llm=True)

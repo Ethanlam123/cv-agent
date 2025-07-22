@@ -131,8 +131,8 @@ Python, JavaScript
             
             result = parse_cv_node(initial_state)
             
-            # Should be called with use_docling=True first
-            mock_create_parser.assert_called_with(temp_path, use_docling=True)
+            # Should be called with use_docling=True and use_llm=True by default
+            mock_create_parser.assert_called_with(temp_path, use_docling=True, use_llm=True)
             assert result["raw_text"] == sample_content
             assert result["file_format"] == "pdf"
             assert result["processing_errors"] == []

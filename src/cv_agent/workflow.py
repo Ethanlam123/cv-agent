@@ -10,10 +10,19 @@ from .nodes.improvement import generate_improvements_node, apply_improvements_no
 def should_apply_improvements(state: CVState) -> str:
     """Conditional edge to determine if improvements should be applied."""
     improvements = state.get("suggested_improvements", [])
-    high_priority_improvements = [
-        imp for imp in improvements 
-        if imp.priority == "high" and imp.confidence > 0.7
-    ]
+    high_priority_improvements = []
+    
+    for imp in improvements:
+        # Handle both Pydantic objects and dictionary formats
+        if hasattr(imp, 'priority'):  # Pydantic object
+            priority = imp.priority
+            confidence = imp.confidence
+        else:  # Dictionary
+            priority = imp.get("priority")
+            confidence = imp.get("confidence", 0)
+        
+        if priority == "high" and confidence > 0.7:
+            high_priority_improvements.append(imp)
     
     if high_priority_improvements:
         return "apply_improvements"
