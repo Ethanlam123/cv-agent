@@ -3,6 +3,9 @@ from typing import Dict, Optional
 from pathlib import Path
 import PyPDF2
 from docx import Document
+from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PipelineOptions
 
 from ..models.state import CVSection
 
@@ -121,14 +124,123 @@ class TextParser(DocumentParser):
             raise ValueError(f"Error parsing text file: {str(e)}")
 
 
+class DoclingParser(DocumentParser):
+    """Advanced document parser using Docling library."""
+    
+    def __init__(self):
+        """Initialize Docling converter with optimized settings for CV parsing."""
+        # Initialize with default configuration - Docling has good defaults for CV parsing
+        self.converter = DocumentConverter()
+    
+    def parse(self, file_path: str) -> str:
+        """Extract text from document using Docling."""
+        try:
+            # Convert document
+            result = self.converter.convert(file_path)
+            
+            # Export to markdown for better structure preservation
+            markdown_content = result.document.export_to_markdown()
+            
+            return markdown_content
+        except Exception as e:
+            raise ValueError(f"Error parsing document with Docling: {str(e)}")
+    
+    def extract_sections(self, text: str) -> Dict[str, CVSection]:
+        """
+        Enhanced section extraction using Docling's structured output.
+        Leverages markdown formatting for better section detection.
+        """
+        sections = {}
+        
+        # Enhanced CV section patterns that work with markdown
+        section_patterns = {
+            'contact': r'(?i)^#+\s*(contact|personal\s+info|personal\s+details)',
+            'summary': r'(?i)^#+\s*(summary|profile|objective|about|professional\s+summary)',
+            'experience': r'(?i)^#+\s*(experience|employment|work\s+history|professional\s+experience)',
+            'education': r'(?i)^#+\s*(education|academic|qualifications|academic\s+background)',
+            'skills': r'(?i)^#+\s*(skills|technical\s+skills|competencies|core\s+competencies)',
+            'projects': r'(?i)^#+\s*(projects|portfolio|key\s+projects)',
+            'certifications': r'(?i)^#+\s*(certifications|certificates|licenses)',
+            'achievements': r'(?i)^#+\s*(achievements|accomplishments|awards)',
+            'languages': r'(?i)^#+\s*(languages|linguistic|language\s+skills)',
+            'references': r'(?i)^#+\s*(references|referees)'
+        }
+        
+        lines = text.split('\n')
+        current_section = 'other'
+        current_content = []
+        position = 0
+        confidence_base = 0.9  # Higher confidence due to structured markdown
+        
+        for line_idx, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Check if line is a markdown header that matches section pattern
+            section_found = None
+            for section_name, pattern in section_patterns.items():
+                if re.match(pattern, line):
+                    section_found = section_name
+                    break
+            
+            if section_found:
+                # Save previous section with content
+                if current_content:
+                    content_text = '\n'.join(current_content)
+                    # Calculate confidence based on content quality
+                    confidence = min(confidence_base + (len(content_text) / 1000), 1.0)
+                    
+                    sections[current_section] = CVSection(
+                        name=current_section,
+                        content=content_text,
+                        position=position,
+                        confidence=confidence
+                    )
+                    position += 1
+                
+                # Start new section
+                current_section = section_found
+                current_content = []
+            else:
+                # Add content to current section (skip empty lines and minor headers)
+                if line and not line.startswith('###'):
+                    current_content.append(line)
+        
+        # Save final section
+        if current_content:
+            content_text = '\n'.join(current_content)
+            confidence = min(confidence_base + (len(content_text) / 1000), 1.0)
+            
+            sections[current_section] = CVSection(
+                name=current_section,
+                content=content_text,
+                position=position,
+                confidence=confidence
+            )
+        
+        return sections
+
+
 class ParserFactory:
     """Factory for creating appropriate parsers based on file extension."""
     
     @staticmethod
-    def create_parser(file_path: str) -> DocumentParser:
-        """Create parser based on file extension."""
+    def create_parser(file_path: str, use_docling: bool = True) -> DocumentParser:
+        """
+        Create parser based on file extension.
+        
+        Args:
+            file_path: Path to the document
+            use_docling: Whether to use Docling parser for supported formats
+        """
         suffix = Path(file_path).suffix.lower()
         
+        # Use Docling for supported formats when available
+        if use_docling and suffix in ['.pdf', '.docx', '.doc']:
+            return DoclingParser()
+        
+        # Fallback to traditional parsers
         if suffix == '.pdf':
             return PDFParser()
         elif suffix in ['.docx', '.doc']:

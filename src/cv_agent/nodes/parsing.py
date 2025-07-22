@@ -9,6 +9,7 @@ from ..tools.parsers import ParserFactory
 def parse_cv_node(state: CVState) -> Dict[str, Any]:
     """
     LangGraph node for parsing CV documents and extracting structured content.
+    Enhanced with Docling parser for better document understanding.
     
     Args:
         state: Current CVState containing the original CV path or content
@@ -28,8 +29,14 @@ def parse_cv_node(state: CVState) -> Dict[str, Any]:
             suffix = Path(file_path).suffix.lower()
             file_format = suffix[1:] if suffix else "unknown"
             
-            # Create appropriate parser
-            parser = ParserFactory.create_parser(file_path)
+            # Create appropriate parser with Docling enabled by default
+            use_docling = True
+            try:
+                parser = ParserFactory.create_parser(file_path, use_docling=use_docling)
+            except ImportError:
+                # Fallback to traditional parsers if Docling is not available
+                print("Warning: Docling not available, falling back to traditional parsers")
+                parser = ParserFactory.create_parser(file_path, use_docling=False)
             
             # Parse the document
             raw_text = parser.parse(file_path)
@@ -40,11 +47,15 @@ def parse_cv_node(state: CVState) -> Dict[str, Any]:
             raw_text = state["original_cv"]
             file_format = "txt"
             
-            # Use text parser for section extraction
-            parser = ParserFactory.create_parser("dummy.txt")
+            # Use text parser for section extraction (no Docling needed for raw text)
+            parser = ParserFactory.create_parser("dummy.txt", use_docling=False)
             parsed_sections = parser.extract_sections(raw_text)
         
         processing_time = time.time() - start_time
+        
+        # Log parsing success
+        parser_type = "Docling" if hasattr(parser, 'converter') else "Traditional"
+        print(f"CV parsed successfully using {parser_type} parser in {processing_time:.2f}s")
         
         return {
             **state,
@@ -58,6 +69,28 @@ def parse_cv_node(state: CVState) -> Dict[str, Any]:
     except Exception as e:
         processing_time = time.time() - start_time
         error_message = f"Error in parse_cv_node: {str(e)}"
+        
+        # Try fallback parsing if Docling fails
+        if "docling" in str(e).lower() and state.get("original_cv", "").startswith("/"):
+            try:
+                print("Docling parsing failed, attempting fallback to traditional parsers...")
+                file_path = state["original_cv"]
+                parser = ParserFactory.create_parser(file_path, use_docling=False)
+                raw_text = parser.parse(file_path)
+                parsed_sections = parser.extract_sections(raw_text)
+                
+                processing_time = time.time() - start_time
+                
+                return {
+                    **state,
+                    "raw_text": raw_text,
+                    "file_format": Path(file_path).suffix.lower()[1:],
+                    "parsed_sections": {name: section.model_dump() for name, section in parsed_sections.items()},
+                    "processing_time": processing_time,
+                    "processing_errors": [f"Docling failed, used fallback parser: {str(e)}"]
+                }
+            except Exception as fallback_error:
+                error_message = f"Both Docling and fallback parsing failed: {str(e)}, {str(fallback_error)}"
         
         return {
             **state,
