@@ -1,0 +1,88 @@
+CONTACT
+Lam Yu Sing, Ethan
+lamyusingethan@gmail.com · github.com/ethanlam123 · kaggle.com/ethanlam0415
+
+SUMMARY
+GDSC x NTNU
+Tech Core Team Member
+
+EDUCATION
+National Taiwan Normal University
+Taipei, TW
+Degree: Bachelor of Science,
+2021 - Anticipated degree 2026
+Major: Mathematics
+Double Major: Computer Science and Information Engineering
+
+St. Stephen's Church College
+Hong Kong
+Elective Courses: Mathematics(M2), ICT, Physics
+2021
+
+SKILLS
+Technical Competencies
+Programming Languages: Python, C, R, Bash, Matlab
+Machine Learning:
+PyTorch, Transformers, Pandas, NumPy, Scikit-learn, Streamlit, Monai, nnUnet
+Developer Tools: Git, Docker, L A T E X
+Languages: Cantonese (Native), Mandarin (Fluent), English (Intermediate)
+
+EXPERIENCE
+Work Experience
+Apple Buds, Inc.
+Taipei, TW
+Teaching Coach
+MAR 2022 - PRESENT
+- Teach programming to students and assist with problem-solving in a flipped classroom setting.
+- Guide students through classroom challenges.
+- Provide feedback on students' performance to parents.
+
+NTNU, Dept. of Mathematics
+Teaching Assistant, MAU0032 Computer Programming
+Taipei, TW
+MAR 2024 - JUN 2024
+- Supported instruction in both basic and advanced programming principles with a focus on practical applications in computer science.
+- Graded homework and exams, ensuring precise and impartial assessments.
+- Addressed student inquiries, providing comprehensive explanations to enhance understanding of programming concepts.
+
+Young Women's Christian Association of Hong Kong
+Trainee Activity Assistant
+Hong Kong JUL 2021 - AUG 2021
+- Designed and hosted a LEGO event for children to foster teamwork and creativity.
+- Assisted social workers in leading activities.
+- Handled daily administrative tasks.
+
+LEADERSHIP_ACTIVITIES
+Leadership & Activities
+Taipei, TW SEP 2023 - JUN 2024
+- Git Workshop: Successfully conducted a Git workshop with 17 participants, focusing on fundamental Git operations and collaborative coding practices.
+- Bash Scripting Workshop: Hosted a workshop on Bash scripting, attended by 13 participants, covering basic to intermediate scripting techniques.
+- Streamlit Workshop: Conducted a workshop on Streamlit, a Python library for creating web applications, with 7 participants.
+- Google Cloud Study Jam: Hosted an event introducing the Google Cloud Study Jam: GenAI Edition, organized by Google. Educated 30 participants on event details, joining instructions, benefits, prizes for completion, and guided them through platform navigation and usage.
+
+PROJECTS
+Projects & Other Experience
+WorldQuant International Quant Championship 2024
+Participant
+- Ranked in Top 5.48% (1,870/34,143) in Stage 1.
+- Ranked in Top 15.69% (675/4300) in Stage 2.
+- Developed a 11 alphas with Fast Expression.
+
+StreamBench: Towards Benchmarking Continuous Improvement of Language Agents SEP 2024 - DEC 2024
+Course Project: Applied Deep Learning
+- Developed dynamic round-robin multi-agent framework for Text-to-SQL generation and medical diagnosis with domain-specific prompt engineering.
+- Achieved 0.68707 accuracy for medical diagnosis and 0.33181 for Text-to-SQL through schema integration and XML tagging techniques.
+- Conducted experiments with embedding models and hyperparameter tuning, collaborating in team documentation and presentation.
+
+Fine-Tuning a Language Model Using Quantized Low-rank Adaptation (QLoRA): A Case Study with Shakespearean Sonnets
+Course Project: Artificial Neural Network
+FEB 2024 - JUN 2024
+- Implemented QLoRA to fine-tune a language model with Shakespearean sonnets.
+- Utilized low-rank adaptation and quantization techniques to reduce the number of parameters and improve efficiency.
+
+Warehouse Management System
+Course Project: Database Theories
+FEB 2025 - JUN 2025
+- Led team in developing complete WMS with Vue.js frontend and Flask backend, including JWT authentication and role-based access control.
+- Engineered secure RESTful API with SQLAlchemy, designed MySQL database schema, and created data initialization scripts.
+- Successfully deployed integrated system with Flask backend on Render, Vue.js frontend on Vercel, and MySQL database on Aiven.

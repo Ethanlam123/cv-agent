@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.8.2",
     "typing-extensions>=4.12.2",
     "docling>=2.0.0",
+    "streamlit>=1.29.0",
 ]
 
 [project.optional-dependencies]
