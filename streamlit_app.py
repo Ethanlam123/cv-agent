@@ -3,7 +3,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
 # Add src directory to path
@@ -215,7 +215,8 @@ def display_chat_interface():
         
         # Add initial bot message
         if questions:
-            bot_message = "I'd like to ask you some questions to better understand your background and provide more personalized CV improvements:"
+            num_questions = len(questions)
+            bot_message = f"Great! I've analyzed your CV and have {num_questions} targeted questions to help create personalized improvement suggestions. This should only take a couple of minutes."
             st.session_state.chat_messages.append({"role": "assistant", "content": bot_message})
             
             # Add first question
@@ -234,8 +235,7 @@ def display_chat_interface():
         st.rerun()
 
 def handle_user_response(response: str):
-    """Handle user response and generate appropriate follow-up."""
-    # Find the current question being answered
+    """Handle user response and generate appropriate follow-up with intelligent conversation flow."""
     current_questions = st.session_state.current_questions
     responses = st.session_state.user_responses
     
@@ -247,23 +247,78 @@ def handle_user_response(response: str):
             current_key = unanswered_questions[0]
             responses[current_key] = response
             
+            # Generate contextual acknowledgment
+            acknowledgment = generate_contextual_acknowledgment(current_key, response)
+            st.session_state.chat_messages.append({"role": "assistant", "content": acknowledgment})
+            
             # Check if there are more questions
             remaining_questions = [key for key in current_questions.keys() if key not in responses]
             
             if remaining_questions:
-                # Ask next question
+                # Ask next question with smooth transition
                 next_key = remaining_questions[0]
                 next_question = current_questions[next_key]
+                
+                # Add transition if needed
+                transition = generate_question_transition(current_key, next_key, response)
+                if transition:
+                    st.session_state.chat_messages.append({"role": "assistant", "content": transition})
+                
                 st.session_state.chat_messages.append({"role": "assistant", "content": next_question})
             else:
                 # All questions answered, generate personalized suggestions
+                completion_message = "Perfect! I now have all the information I need. Let me generate personalized suggestions based on your responses..."
+                st.session_state.chat_messages.append({"role": "assistant", "content": completion_message})
                 generate_personalized_suggestions()
         else:
-            # All questions answered, this might be follow-up conversation
-            st.session_state.chat_messages.append({
-                "role": "assistant", 
-                "content": "Thank you for the additional information! I've noted that down."
-            })
+            # All questions answered, handle follow-up conversation
+            handle_followup_conversation(response)
+
+def generate_contextual_acknowledgment(question_key: str, response: str) -> str:
+    """Generate contextual acknowledgment based on the question type and response."""
+    acknowledgments = {
+        "target_role": f"Great! Focusing on {response} roles will help me provide targeted advice.",
+        "target_industry": f"Excellent! The {response} industry has specific requirements I can address.",
+        "professional_summary": "That's helpful context for strengthening your professional summary.",
+        "key_skills": "Those skills will be important to highlight effectively.",
+        "work_experience": "Thanks for sharing that experience - it gives me insight into your background.",
+        "experience_details": "Those details will help make your experience section much more compelling.",
+        "achievements": "Fantastic! Quantifiable achievements like these make a huge difference.",
+        "career_stage": "Understanding your career stage helps me tailor my recommendations.",
+        "application_context": "This context will help me provide more targeted suggestions."
+    }
+    
+    return acknowledgments.get(question_key, "Thank you for that information!")
+
+def generate_question_transition(current_key: str, next_key: str, response: str) -> Optional[str]:
+    """Generate smooth transitions between questions."""
+    # Special case for industry transition that uses response
+    if current_key == "target_industry" and next_key == "key_skills":
+        return f"For the {response} industry, technical skills are crucial."
+    
+    transitions = {
+        ("target_role", "target_industry"): None,  # Already contextual
+        ("target_role", "professional_summary"): "Now let's work on making your CV stand out for these roles.",
+        ("professional_summary", "key_skills"): "Next, let's ensure your key skills are properly showcased.",
+        ("key_skills", "achievements"): "Now I'd like to help you quantify your impact.",
+        ("work_experience", "achievements"): "Let's add some concrete numbers to make your experience more impressive.",
+    }
+    
+    return transitions.get((current_key, next_key))
+
+def handle_followup_conversation(response: str):
+    """Handle ongoing conversation after initial questions."""
+    # Simple follow-up responses for additional conversation
+    followup_responses = [
+        "I've noted that additional information. Is there anything specific about your CV you'd like me to focus on?",
+        "Thanks for the extra context! This will help refine my suggestions.",
+        "That's useful information. Feel free to share any other details you think would be helpful.",
+        "Got it! Any other aspects of your job search you'd like assistance with?"
+    ]
+    
+    import random
+    response_text = random.choice(followup_responses)
+    st.session_state.chat_messages.append({"role": "assistant", "content": response_text})
 
 def generate_personalized_suggestions():
     """Generate personalized suggestions based on user responses."""

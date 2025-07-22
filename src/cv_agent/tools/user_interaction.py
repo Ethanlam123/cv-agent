@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -14,13 +14,13 @@ class UserInteractionManager:
     
     def ask_for_more_information(self, state: CVState) -> Dict[str, str]:
         """
-        Ask user for more specific information based on CV analysis.
+        Ask user for more specific information based on CV analysis with intelligent prioritization.
         
         Args:
             state: Current CV processing state
             
         Returns:
-            Dictionary with questions for the user
+            Dictionary with prioritized questions for the user
         """
         questions = {}
         
@@ -29,32 +29,61 @@ class UserInteractionManager:
         target_role = state.get("target_role")
         target_industry = state.get("target_industry")
         
-        # Generate questions based on missing or weak sections
+        # Priority 1: Essential targeting information (always ask first)
         if not target_role:
-            questions["target_role"] = "What specific job role are you targeting? (e.g., 'Senior Data Scientist', 'Full Stack Developer')"
+            questions["target_role"] = "I'd like to tailor my suggestions to your goals. What specific job role are you targeting? (e.g., 'Senior Software Engineer', 'Marketing Manager', 'Data Analyst')"
         
-        if not target_industry:
-            questions["target_industry"] = "What industry are you focusing on? (e.g., 'technology', 'healthcare', 'finance')"
+        if not target_industry and target_role:
+            # Make industry question contextual to the role
+            questions["target_industry"] = f"Great! For a {target_role} position, which industry interests you most? (e.g., 'technology', 'healthcare', 'finance', 'consulting')"
+        elif not target_industry:
+            questions["target_industry"] = "Which industry or sector are you focusing your job search on?"
         
-        # Check for missing or weak sections
+        # Priority 2: Critical missing sections that impact ATS and first impressions
         if "summary" not in parsed_sections or len(parsed_sections.get("summary", {}).get("content", "")) < 50:
-            questions["professional_summary"] = "Could you provide a brief professional summary highlighting your key strengths and career goals?"
+            if target_role:
+                questions["professional_summary"] = f"I notice your CV could benefit from a stronger professional summary. Can you describe your key strengths and what makes you an ideal {target_role} candidate in 2-3 sentences?"
+            else:
+                questions["professional_summary"] = "Your CV would benefit from a compelling professional summary. What are your key strengths and career highlights that set you apart?"
         
-        if "skills" not in parsed_sections:
-            questions["key_skills"] = "What are your top 5-10 technical skills most relevant to your target role?"
+        # Priority 3: Skills gap analysis
+        if "skills" not in parsed_sections or len(parsed_sections.get("skills", {}).get("content", "")) < 30:
+            if target_role:
+                questions["key_skills"] = f"To optimize your CV for {target_role} positions, what are your strongest technical skills and tools? Please list 5-8 most relevant ones."
+            else:
+                questions["key_skills"] = "What are your core technical skills, software proficiencies, or specialized competencies? List your top 5-8."
         
+        # Priority 4: Experience enhancement (context-aware)
         if "experience" not in parsed_sections or len(parsed_sections.get("experience", {}).get("content", "")) < 100:
-            questions["work_experience"] = "Could you elaborate on your most relevant work experience and key achievements?"
+            questions["work_experience"] = "I'd like to help strengthen your experience section. Can you tell me about your most relevant role and 2-3 key accomplishments or projects?"
+        elif self._has_weak_experience_descriptions(parsed_sections):
+            questions["experience_details"] = "Your experience section could be more impactful. Can you share specific results or achievements from your current/recent role? (e.g., projects led, problems solved, improvements made)"
         
-        # Generate questions about career goals and preferences
-        questions["career_goals"] = "What are your short-term and long-term career goals?"
-        questions["preferred_companies"] = "Are there specific types of companies or work environments you prefer?"
-        
-        # Ask about quantifiable achievements
+        # Priority 5: Quantifiable achievements (highly targeted)
         if self._lacks_quantifiable_metrics(parsed_sections):
-            questions["achievements"] = "Can you provide specific metrics or numbers that demonstrate your impact? (e.g., 'increased sales by 25%', 'managed team of 8 people')"
+            if "experience" in parsed_sections:
+                questions["achievements"] = "Numbers make a huge difference! Can you quantify any of your achievements? (e.g., 'increased efficiency by 30%', 'managed $2M budget', 'led team of 12')"
+            else:
+                questions["achievements"] = "Do you have any measurable accomplishments or results you can share? Even approximate numbers help (e.g., team size, budget, percentages, timeframes)"
         
-        return questions
+        # Priority 6: Career context (only if basics are covered)
+        if len(questions) <= 2:  # Only ask if not overwhelming with basic questions
+            if target_role and target_industry:
+                questions["career_stage"] = f"To provide the most relevant advice, are you looking to advance within {target_industry}, transition from another field, or return after a break?"
+            else:
+                questions["career_goals"] = "What's your main career objective right now? (advancing in current field, changing industries, seeking leadership roles, etc.)"
+        
+        # Priority 7: Application-specific context (advanced)
+        if len(questions) <= 1:  # Only if most basics are covered
+            questions["application_context"] = "Are you applying to specific companies or types of roles? This helps me tailor keyword and formatting suggestions."
+        
+        # Limit to 3-4 questions max to avoid overwhelming the user
+        prioritized_questions = {}
+        question_keys = list(questions.keys())
+        for key in question_keys[:4]:  # Take first 4 prioritized questions
+            prioritized_questions[key] = questions[key]
+        
+        return prioritized_questions
     
     def generate_specific_suggestions(self, state: CVState, user_responses: Dict[str, str] = None) -> List[Dict[str, Any]]:
         """
@@ -170,6 +199,8 @@ class UserInteractionManager:
             r'increased.*\d+',  # Increased by number
             r'reduced.*\d+',   # Reduced by number
             r'managed.*\d+',   # Managed X people/projects
+            r'\d+\s*(years?|months?)',  # Time periods
+            r'\d+\s*(people|team|members)',  # Team sizes
         ]
         
         for pattern in metrics_patterns:
@@ -177,6 +208,33 @@ class UserInteractionManager:
                 return False
         
         return True
+    
+    def _has_weak_experience_descriptions(self, parsed_sections: Dict) -> bool:
+        """Check if experience descriptions are weak or generic."""
+        experience_section = parsed_sections.get("experience", {})
+        if not experience_section:
+            return True
+            
+        experience_content = experience_section.get("content", "").lower()
+        
+        # Check for weak indicators
+        weak_phrases = [
+            "worked on", "responsible for", "involved in", "participated in",
+            "helped with", "assisted with", "various projects", "daily tasks",
+            "collaborated with team", "used programming languages"
+        ]
+        
+        # Check for strength indicators
+        strong_phrases = [
+            "led", "developed", "implemented", "designed", "created", "built",
+            "optimized", "improved", "achieved", "delivered", "launched"
+        ]
+        
+        weak_count = sum(1 for phrase in weak_phrases if phrase in experience_content)
+        strong_count = sum(1 for phrase in strong_phrases if phrase in experience_content)
+        
+        # If more weak phrases than strong ones, or very short content
+        return weak_count > strong_count or len(experience_content) < 200
     
     def _prepare_context(self, state: CVState, user_responses: Dict[str, str] = None) -> str:
         """Prepare context string for LLM analysis."""
@@ -240,6 +298,7 @@ class UserInteractionManager:
     
     def _generate_rule_based_suggestions(self, state: CVState, user_responses: Dict[str, str] = None) -> List[Dict[str, Any]]:
         """Generate suggestions using rule-based approach as fallback."""
+        # user_responses parameter kept for API consistency but not used in rule-based approach
         suggestions = []
         parsed_sections = state.get("parsed_sections", {})
         
