@@ -12,7 +12,7 @@ def should_apply_improvements(state: CVState) -> str:
     improvements = state.get("suggested_improvements", [])
     high_priority_improvements = [
         imp for imp in improvements 
-        if imp.get("priority") == "high" and imp.get("confidence", 0) > 0.7
+        if imp.priority == "high" and imp.confidence > 0.7
     ]
     
     if high_priority_improvements:

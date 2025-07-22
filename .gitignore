@@ -56,13 +56,16 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+*.cover
+.hypothesis/
+.coverage.*
 
 # LangSmith
 .langsmith/
 
 # Claude
 .claude
-CLAUDE.md
 
 # Temporary files
 *.tmp
