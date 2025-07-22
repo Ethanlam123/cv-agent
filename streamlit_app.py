@@ -14,6 +14,7 @@ load_dotenv()
 
 from src.cv_agent.workflow import CVImprovementAgent
 from src.cv_agent.tools.user_interaction import UserInteractionManager
+from src.cv_agent.tools.jd_analyzer import JobDescriptionAnalyzer
 
 def create_sample_cv() -> str:
     """Create a sample CV for testing."""
@@ -39,6 +40,46 @@ SKILLS
 Python, JavaScript, HTML, CSS
 """
 
+def create_sample_jd() -> str:
+    """Create a sample job description for testing."""
+    return """
+Senior Software Engineer - Full Stack Development
+
+About the Role:
+We are seeking a highly skilled Senior Software Engineer to join our dynamic development team. The ideal candidate will have 5+ years of experience in full-stack web development and a passion for building scalable applications.
+
+Key Responsibilities:
+- Design and develop robust web applications using React and Node.js
+- Build and maintain RESTful APIs and microservices
+- Work with cloud platforms (AWS, Azure) for deployment and scaling
+- Collaborate with cross-functional teams including product managers and designers
+- Mentor junior developers and conduct code reviews
+- Implement best practices for testing, security, and performance optimization
+
+Required Qualifications:
+- Bachelor's degree in Computer Science or related field
+- 5+ years of experience in software development
+- Strong proficiency in JavaScript, TypeScript, and Python
+- Experience with React, Node.js, and modern front-end frameworks
+- Knowledge of database systems (SQL and NoSQL)
+- Experience with cloud services (AWS preferred)
+- Understanding of DevOps practices and CI/CD pipelines
+- Strong problem-solving and communication skills
+
+Preferred Qualifications:
+- Experience with Docker and Kubernetes
+- Knowledge of machine learning frameworks
+- Previous experience in agile development environments
+- Contributing to open-source projects
+
+Benefits:
+- Competitive salary: $120,000 - $160,000
+- Remote work options available
+- Health, dental, and vision insurance
+- 401(k) matching
+- Professional development budget
+"""
+
 def init_session_state():
     """Initialize session state variables."""
     if "agent" not in st.session_state:
@@ -47,6 +88,8 @@ def init_session_state():
         st.session_state.processed_result = None
     if "user_interaction_manager" not in st.session_state:
         st.session_state.user_interaction_manager = UserInteractionManager()
+    if "jd_analyzer" not in st.session_state:
+        st.session_state.jd_analyzer = JobDescriptionAnalyzer()
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
     if "questions_generated" not in st.session_state:
@@ -55,6 +98,12 @@ def init_session_state():
         st.session_state.current_questions = {}
     if "user_responses" not in st.session_state:
         st.session_state.user_responses = {}
+    if "jd_analysis" not in st.session_state:
+        st.session_state.jd_analysis = None
+    if "jd_match_results" not in st.session_state:
+        st.session_state.jd_match_results = None
+    if "jd_suggestions" not in st.session_state:
+        st.session_state.jd_suggestions = None
 
 def display_analysis_scores(scores):
     """Display analysis scores in a formatted way."""
@@ -264,6 +313,163 @@ def display_personalized_suggestions():
             st.write(f"**Action:** {suggestion.get('action', 'No action specified')}")
             st.write(f"**Expected Impact:** {suggestion.get('impact', 'Impact not specified')}")
 
+def display_jd_interface():
+    """Display job description input and analysis interface."""
+    st.subheader("💼 Job Description Analysis")
+    
+    # Sample JD option
+    use_sample_jd = st.checkbox("Use sample job description for testing")
+    
+    # Job description input
+    if use_sample_jd:
+        jd_text = st.text_area(
+            "Job Description (Sample):",
+            value=create_sample_jd(),
+            height=200,
+            help="Sample job description for testing the matching functionality"
+        )
+    else:
+        jd_text = st.text_area(
+            "Paste the Job Description here:",
+            height=200,
+            placeholder="Copy and paste the complete job description here...",
+            help="Include the full job posting with requirements, responsibilities, and qualifications"
+        )
+    
+    # Analyze button
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        analyze_jd = st.button("🔍 Analyze JD", type="primary")
+    
+    if analyze_jd and jd_text and st.session_state.processed_result:
+        with st.spinner("Analyzing job description and matching against your CV..."):
+            try:
+                # Analyze job description
+                jd_analysis = st.session_state.jd_analyzer.analyze_job_description(jd_text)
+                st.session_state.jd_analysis = jd_analysis
+                
+                # Match CV against JD
+                match_results = st.session_state.jd_analyzer.match_cv_to_jd(
+                    st.session_state.processed_result, 
+                    jd_analysis
+                )
+                st.session_state.jd_match_results = match_results
+                
+                # Generate JD-specific suggestions
+                jd_suggestions = st.session_state.jd_analyzer.generate_jd_specific_suggestions(
+                    st.session_state.processed_result,
+                    jd_analysis,
+                    match_results
+                )
+                st.session_state.jd_suggestions = jd_suggestions
+                
+                st.success("Job description analyzed successfully!")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error analyzing job description: {str(e)}")
+    
+    elif analyze_jd and not st.session_state.processed_result:
+        st.warning("Please process your CV first before analyzing job descriptions.")
+    elif analyze_jd and not jd_text:
+        st.warning("Please paste a job description to analyze.")
+
+def display_jd_analysis_results():
+    """Display job description analysis results."""
+    if not st.session_state.jd_analysis:
+        st.info("Analyze a job description to see matching results here.")
+        return
+    
+    jd_analysis = st.session_state.jd_analysis
+    match_results = st.session_state.jd_match_results
+    
+    # Job information
+    st.subheader("📋 Job Information")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Position", jd_analysis.job_title)
+        if jd_analysis.required_experience_years:
+            st.metric("Required Experience", f"{jd_analysis.required_experience_years} years")
+    
+    with col2:
+        if match_results:
+            st.metric("Overall Match Score", f"{match_results['overall_match_score']:.1%}")
+    
+    if match_results:
+        # Match breakdown
+        st.subheader("🎯 Matching Analysis")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            # Technical skills match
+            tech_match = match_results["technical_skills_match"]
+            st.metric(
+                "Technical Skills Match", 
+                f"{tech_match['match_percentage']:.1%}",
+                f"{tech_match['total_required']} total skills"
+            )
+            
+            if tech_match["matched_skills"]:
+                st.success(f"✅ **Matched Skills:** {', '.join(tech_match['matched_skills'][:5])}")
+            
+            if tech_match["missing_skills"]:
+                st.error(f"❌ **Missing Skills:** {', '.join(tech_match['missing_skills'][:5])}")
+        
+        with col2:
+            # Experience match
+            exp_match = match_results["experience_match"]
+            exp_status = "✅ Meets Requirement" if exp_match["meets_requirement"] else "❌ Below Requirement"
+            st.metric("Experience Match", exp_status)
+            
+            if exp_match["gap_years"] > 0:
+                st.warning(f"⚠️ Gap: {exp_match['gap_years']} years short of requirement")
+        
+        # Gap analysis
+        if match_results["gap_analysis"]:
+            st.subheader("🔍 Gap Analysis")
+            for gap in match_results["gap_analysis"]:
+                st.warning(f"• {gap}")
+
+def display_jd_specific_suggestions():
+    """Display JD-specific improvement suggestions."""
+    if not st.session_state.jd_suggestions:
+        return
+    
+    st.subheader("💡 Job-Specific Recommendations")
+    st.write("Based on this job description, here are targeted improvements:")
+    
+    # Group suggestions by priority
+    high_priority = [s for s in st.session_state.jd_suggestions if s.get('priority', '').lower() == 'high']
+    medium_priority = [s for s in st.session_state.jd_suggestions if s.get('priority', '').lower() == 'medium']
+    low_priority = [s for s in st.session_state.jd_suggestions if s.get('priority', '').lower() == 'low']
+    
+    # Display high priority first
+    if high_priority:
+        st.markdown("### 🔥 High Priority")
+        for i, suggestion in enumerate(high_priority, 1):
+            with st.expander(f"🚨 {suggestion.get('title', 'High Priority Suggestion')}", expanded=True):
+                st.write(f"**Why Important:** {suggestion.get('reason', 'No reason provided')}")
+                st.write(f"**Action Steps:** {suggestion.get('action', 'No action specified')}")
+                st.write(f"**Expected Impact:** {suggestion.get('impact', 'Impact not specified')}")
+    
+    # Display medium priority
+    if medium_priority:
+        st.markdown("### 📈 Medium Priority")
+        for suggestion in medium_priority:
+            with st.expander(f"⚡ {suggestion.get('title', 'Medium Priority Suggestion')}"):
+                st.write(f"**Why Important:** {suggestion.get('reason', 'No reason provided')}")
+                st.write(f"**Action Steps:** {suggestion.get('action', 'No action specified')}")
+                st.write(f"**Expected Impact:** {suggestion.get('impact', 'Impact not specified')}")
+    
+    # Display low priority
+    if low_priority:
+        st.markdown("### 📝 Additional Improvements")
+        for suggestion in low_priority:
+            with st.expander(f"💡 {suggestion.get('title', 'Additional Suggestion')}"):
+                st.write(f"**Why Helpful:** {suggestion.get('reason', 'No reason provided')}")
+                st.write(f"**Action Steps:** {suggestion.get('action', 'No action specified')}")
+                st.write(f"**Expected Impact:** {suggestion.get('impact', 'Impact not specified')}")
+
 def main():
     st.set_page_config(
         page_title="CV Improvement Agent",
@@ -343,7 +549,7 @@ def main():
             result = st.session_state.processed_result
             
             # Create tabs for better organization
-            tab1, tab2, tab3 = st.tabs(["📊 Analysis", "💬 Chat Enhancement", "✨ Final Results"])
+            tab1, tab2, tab3, tab4 = st.tabs(["📊 Analysis", "💬 Chat Enhancement", "💼 Job Matching", "✨ Final Results"])
             
             with tab1:
                 # Display analysis scores
@@ -373,6 +579,16 @@ def main():
                 display_personalized_suggestions()
             
             with tab3:
+                # Job Description Analysis
+                display_jd_interface()
+                
+                # Display JD analysis results
+                display_jd_analysis_results()
+                
+                # Display JD-specific suggestions
+                display_jd_specific_suggestions()
+            
+            with tab4:
                 # Display enhanced CV
                 if result.get("enhanced_cv"):
                     display_enhanced_cv(result["enhanced_cv"])
