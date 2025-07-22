@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 load_dotenv()
 
 from src.cv_agent.workflow import CVImprovementAgent
+from src.cv_agent.tools.user_interaction import UserInteractionManager
 
 def create_sample_cv() -> str:
     """Create a sample CV for testing."""
@@ -44,6 +45,16 @@ def init_session_state():
         st.session_state.agent = CVImprovementAgent()
     if "processed_result" not in st.session_state:
         st.session_state.processed_result = None
+    if "user_interaction_manager" not in st.session_state:
+        st.session_state.user_interaction_manager = UserInteractionManager()
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+    if "questions_generated" not in st.session_state:
+        st.session_state.questions_generated = False
+    if "current_questions" not in st.session_state:
+        st.session_state.current_questions = {}
+    if "user_responses" not in st.session_state:
+        st.session_state.user_responses = {}
 
 def display_analysis_scores(scores):
     """Display analysis scores in a formatted way."""
@@ -125,6 +136,134 @@ def display_enhanced_cv(enhanced_cv: str):
     st.subheader("✨ Enhanced CV")
     st.text_area("Enhanced CV Content", enhanced_cv, height=400)
 
+def display_chat_interface():
+    """Display interactive chat interface for gathering user information."""
+    st.subheader("💬 CV Enhancement Chat")
+    
+    # Display existing chat messages
+    for message in st.session_state.chat_messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+    
+    # Generate questions if CV has been processed and questions haven't been generated yet
+    if (st.session_state.processed_result and 
+        not st.session_state.questions_generated and 
+        st.session_state.processed_result.get("parsed_sections")):
+        
+        # Create a mock state object for the UserInteractionManager
+        mock_state = {
+            "parsed_sections": st.session_state.processed_result.get("parsed_sections", {}),
+            "target_role": st.session_state.processed_result.get("target_role"),
+            "target_industry": st.session_state.processed_result.get("target_industry"),
+            "analysis_scores": st.session_state.processed_result.get("analysis_scores"),
+            "identified_gaps": st.session_state.processed_result.get("identified_gaps", [])
+        }
+        
+        # Generate questions
+        questions = st.session_state.user_interaction_manager.ask_for_more_information(mock_state)
+        st.session_state.current_questions = questions
+        st.session_state.questions_generated = True
+        
+        # Add initial bot message
+        if questions:
+            bot_message = "I'd like to ask you some questions to better understand your background and provide more personalized CV improvements:"
+            st.session_state.chat_messages.append({"role": "assistant", "content": bot_message})
+            
+            # Add first question
+            first_question = list(questions.values())[0]
+            st.session_state.chat_messages.append({"role": "assistant", "content": first_question})
+            st.rerun()
+    
+    # Chat input
+    if prompt := st.chat_input("Your response..."):
+        # Add user message
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+        
+        # Process user response
+        handle_user_response(prompt)
+        
+        st.rerun()
+
+def handle_user_response(response: str):
+    """Handle user response and generate appropriate follow-up."""
+    # Find the current question being answered
+    current_questions = st.session_state.current_questions
+    responses = st.session_state.user_responses
+    
+    if current_questions:
+        # Map response to current question
+        unanswered_questions = [key for key in current_questions.keys() if key not in responses]
+        
+        if unanswered_questions:
+            current_key = unanswered_questions[0]
+            responses[current_key] = response
+            
+            # Check if there are more questions
+            remaining_questions = [key for key in current_questions.keys() if key not in responses]
+            
+            if remaining_questions:
+                # Ask next question
+                next_key = remaining_questions[0]
+                next_question = current_questions[next_key]
+                st.session_state.chat_messages.append({"role": "assistant", "content": next_question})
+            else:
+                # All questions answered, generate personalized suggestions
+                generate_personalized_suggestions()
+        else:
+            # All questions answered, this might be follow-up conversation
+            st.session_state.chat_messages.append({
+                "role": "assistant", 
+                "content": "Thank you for the additional information! I've noted that down."
+            })
+
+def generate_personalized_suggestions():
+    """Generate personalized suggestions based on user responses."""
+    try:
+        # Create state object with user responses
+        mock_state = {
+            "parsed_sections": st.session_state.processed_result.get("parsed_sections", {}),
+            "target_role": st.session_state.processed_result.get("target_role"),
+            "target_industry": st.session_state.processed_result.get("target_industry"),
+            "analysis_scores": st.session_state.processed_result.get("analysis_scores"),
+            "identified_gaps": st.session_state.processed_result.get("identified_gaps", [])
+        }
+        
+        # Generate suggestions with user responses
+        suggestions = st.session_state.user_interaction_manager.generate_specific_suggestions(
+            mock_state, 
+            st.session_state.user_responses
+        )
+        
+        # Store suggestions in session state
+        st.session_state.personalized_suggestions = suggestions
+        
+        # Add completion message
+        st.session_state.chat_messages.append({
+            "role": "assistant",
+            "content": f"Perfect! Based on your responses, I've generated {len(suggestions)} personalized suggestions for improving your CV. You can view them in the 'Personalized Suggestions' section below."
+        })
+        
+    except Exception as e:
+        st.session_state.chat_messages.append({
+            "role": "assistant",
+            "content": f"I encountered an issue generating personalized suggestions: {str(e)}. However, you can still see the general improvements above."
+        })
+
+def display_personalized_suggestions():
+    """Display personalized suggestions generated from chat responses."""
+    if not hasattr(st.session_state, 'personalized_suggestions') or not st.session_state.personalized_suggestions:
+        return
+    
+    st.subheader("🎯 Personalized Suggestions")
+    st.write("Based on our conversation, here are tailored recommendations:")
+    
+    for i, suggestion in enumerate(st.session_state.personalized_suggestions, 1):
+        with st.expander(f"Suggestion {i}: {suggestion.get('title', 'Recommendation')}"):
+            st.write(f"**Priority:** {suggestion.get('priority', 'medium').title()}")
+            st.write(f"**Why:** {suggestion.get('reason', 'No reason provided')}")
+            st.write(f"**Action:** {suggestion.get('action', 'No action specified')}")
+            st.write(f"**Expected Impact:** {suggestion.get('impact', 'Impact not specified')}")
+
 def main():
     st.set_page_config(
         page_title="CV Improvement Agent",
@@ -203,39 +342,51 @@ def main():
         if st.session_state.processed_result:
             result = st.session_state.processed_result
             
-            # Display analysis scores
-            if result.get("analysis_scores"):
-                display_analysis_scores(result["analysis_scores"])
+            # Create tabs for better organization
+            tab1, tab2, tab3 = st.tabs(["📊 Analysis", "💬 Chat Enhancement", "✨ Final Results"])
             
-            # Display processing summary
-            if result.get("enhancement_summary"):
-                st.subheader("📋 Summary")
-                st.write(result["enhancement_summary"])
+            with tab1:
+                # Display analysis scores
+                if result.get("analysis_scores"):
+                    display_analysis_scores(result["analysis_scores"])
+                
+                # Display processing summary
+                if result.get("enhancement_summary"):
+                    st.subheader("📋 Summary")
+                    st.write(result["enhancement_summary"])
+                
+                # Display identified gaps
+                if result.get("identified_gaps"):
+                    st.subheader("🎯 Identified Gaps")
+                    for gap in result["identified_gaps"]:
+                        st.write(f"• {gap}")
+                
+                # Display improvements
+                if result.get("suggested_improvements"):
+                    display_improvements(result["suggested_improvements"])
             
-            # Display identified gaps
-            if result.get("identified_gaps"):
-                st.subheader("🎯 Identified Gaps")
-                for gap in result["identified_gaps"]:
-                    st.write(f"• {gap}")
+            with tab2:
+                # Interactive chat interface
+                display_chat_interface()
+                
+                # Display personalized suggestions if available
+                display_personalized_suggestions()
             
-            # Display improvements
-            if result.get("suggested_improvements"):
-                display_improvements(result["suggested_improvements"])
-            
-            # Display enhanced CV
-            if result.get("enhanced_cv"):
-                display_enhanced_cv(result["enhanced_cv"])
-            
-            # Display processing errors if any
-            if result.get("processing_errors"):
-                st.subheader("⚠️ Processing Issues")
-                for error in result["processing_errors"]:
-                    st.warning(error)
-            
-            # Final quality score
-            if result.get("final_quality_score"):
-                st.subheader("🏆 Final Quality Score")
-                st.metric("Updated Score", f"{result['final_quality_score']:.1%}")
+            with tab3:
+                # Display enhanced CV
+                if result.get("enhanced_cv"):
+                    display_enhanced_cv(result["enhanced_cv"])
+                
+                # Display processing errors if any
+                if result.get("processing_errors"):
+                    st.subheader("⚠️ Processing Issues")
+                    for error in result["processing_errors"]:
+                        st.warning(error)
+                
+                # Final quality score
+                if result.get("final_quality_score"):
+                    st.subheader("🏆 Final Quality Score")
+                    st.metric("Updated Score", f"{result['final_quality_score']:.1%}")
         
         else:
             st.info("Upload and process a CV to see results here.")
