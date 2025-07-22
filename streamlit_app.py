@@ -185,6 +185,128 @@ def display_enhanced_cv(enhanced_cv: str):
     st.subheader("✨ Enhanced CV")
     st.text_area("Enhanced CV Content", enhanced_cv, height=400)
 
+def display_cv_before_after_comparison():
+    """Display before and after CV comparison side by side."""
+    if not st.session_state.processed_result:
+        return
+    
+    original_cv = st.session_state.processed_result.get("original_cv_text", "")
+    enhanced_cv = st.session_state.processed_result.get("enhanced_cv", "")
+    
+    if not original_cv and not enhanced_cv:
+        st.info("No CV comparison available. Process a CV to see before/after comparison.")
+        return
+    
+    st.subheader("📊 Before vs After Comparison")
+    
+    # Create tabs for different view modes
+    tab1, tab2, tab3, tab4 = st.tabs(["Side by Side", "Before Only", "After Only", "Key Changes"])
+    
+    with tab1:
+        if original_cv or enhanced_cv:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 📝 **Original CV**")
+                if original_cv:
+                    st.text_area("Original CV", original_cv, height=500, key="original_cv_display")
+                else:
+                    st.info("Original CV content not available")
+            
+            with col2:
+                st.markdown("### ✨ **Enhanced CV**")
+                if enhanced_cv:
+                    st.text_area("Enhanced CV", enhanced_cv, height=500, key="enhanced_cv_display")
+                else:
+                    st.info("Enhanced CV not yet generated")
+    
+    with tab2:
+        st.markdown("### 📝 **Original CV**")
+        if original_cv:
+            st.text_area("Original CV Content", original_cv, height=600, key="original_only")
+        else:
+            st.info("Original CV content not available")
+    
+    with tab3:
+        st.markdown("### ✨ **Enhanced CV**")
+        if enhanced_cv:
+            st.text_area("Enhanced CV Content", enhanced_cv, height=600, key="enhanced_only")
+        else:
+            st.info("Enhanced CV not yet generated")
+    
+    with tab4:
+        st.markdown("### 🔍 **Key Changes Analysis**")
+        if original_cv and enhanced_cv:
+            # Simple change detection - could be enhanced with proper diff algorithms
+            original_sections = original_cv.split('\n\n')
+            enhanced_sections = enhanced_cv.split('\n\n')
+            
+            st.markdown("**Notable Changes:**")
+            
+            # Basic change analysis
+            if len(enhanced_sections) > len(original_sections):
+                st.success(f"✅ **Added {len(enhanced_sections) - len(original_sections)} new sections**")
+            elif len(enhanced_sections) < len(original_sections):
+                st.info(f"📝 **Consolidated {len(original_sections) - len(enhanced_sections)} sections**")
+            
+            # Word count changes
+            original_words = original_cv.split()
+            enhanced_words = enhanced_cv.split()
+            word_diff = len(enhanced_words) - len(original_words)
+            
+            if word_diff > 0:
+                st.success(f"✅ **Added {word_diff} words** for more detailed descriptions")
+            elif word_diff < 0:
+                st.info(f"📝 **Reduced by {abs(word_diff)} words** for better conciseness")
+            else:
+                st.info("📊 **Maintained similar length** while improving content quality")
+            
+            # Check for specific improvements
+            improvement_indicators = {
+                "quantified": ["increased", "decreased", "improved", "%", "$", "managed"],
+                "action_words": ["developed", "implemented", "led", "created", "designed", "optimized"],
+                "technical": ["API", "database", "framework", "technology", "system"],
+                "skills": ["Python", "JavaScript", "SQL", "AWS", "React", "Node.js"]
+            }
+            
+            for category, keywords in improvement_indicators.items():
+                original_count = sum(1 for word in keywords if word.lower() in original_cv.lower())
+                enhanced_count = sum(1 for word in keywords if word.lower() in enhanced_cv.lower())
+                
+                if enhanced_count > original_count:
+                    improvement = enhanced_count - original_count
+                    category_name = category.replace("_", " ").title()
+                    st.success(f"✅ **{category_name}**: Added {improvement} relevant terms")
+        else:
+            st.info("Process a CV to see detailed change analysis.")
+    
+    # Add improvement summary if available
+    if original_cv and enhanced_cv:
+        st.subheader("📈 Improvement Summary")
+        
+        # Calculate basic metrics
+        original_length = len(original_cv.split())
+        enhanced_length = len(enhanced_cv.split())
+        length_change = enhanced_length - original_length
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Original Word Count", original_length)
+        with col2:
+            st.metric("Enhanced Word Count", enhanced_length)
+        with col3:
+            st.metric("Word Count Change", length_change, delta=length_change)
+        
+        # Show key improvements if available
+        if st.session_state.processed_result.get("suggested_improvements"):
+            st.markdown("**Key Improvements Applied:**")
+            improvements = st.session_state.processed_result["suggested_improvements"]
+            for i, improvement in enumerate(improvements[:5], 1):  # Show top 5
+                if hasattr(improvement, 'reasoning'):
+                    st.write(f"{i}. {improvement.reasoning}")
+                elif isinstance(improvement, dict):
+                    st.write(f"{i}. {improvement.get('reasoning', 'Improvement applied')}")
+
 def display_chat_interface():
     """Display interactive chat interface for gathering user information."""
     st.subheader("💬 CV Enhancement Chat")
@@ -585,6 +707,8 @@ def main():
                         target_role=target_role if target_role else None,
                         target_industry=target_industry if target_industry else None
                     )
+                    # Store original CV text for before/after comparison
+                    result["original_cv_text"] = result.get("raw_text", cv_input if isinstance(cv_input, str) and not cv_input.startswith("/") else "")
                     st.session_state.processed_result = result
                     st.success("CV processed successfully!")
                 except Exception as e:
@@ -604,7 +728,7 @@ def main():
             result = st.session_state.processed_result
             
             # Create tabs for better organization
-            tab1, tab2, tab3, tab4 = st.tabs(["📊 Analysis", "💬 Chat Enhancement", "💼 Job Matching", "✨ Final Results"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Analysis", "💬 Chat Enhancement", "💼 Job Matching", "📊 Before/After", "✨ Final Results"])
             
             with tab1:
                 # Display analysis scores
@@ -644,6 +768,10 @@ def main():
                 display_jd_specific_suggestions()
             
             with tab4:
+                # Display before/after comparison
+                display_cv_before_after_comparison()
+            
+            with tab5:
                 # Display enhanced CV
                 if result.get("enhanced_cv"):
                     display_enhanced_cv(result["enhanced_cv"])
