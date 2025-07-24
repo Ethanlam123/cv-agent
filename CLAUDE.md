@@ -26,6 +26,9 @@ source .venv/bin/activate
 # Run the interactive CLI
 python main.py
 
+# Run the Streamlit web interface
+streamlit run streamlit_app.py
+
 # For development/testing with sample CV
 python main.py
 # Choose 'y' for sample CV, then specify target role/industry
@@ -46,25 +49,29 @@ This is a LangGraph-based CV improvement agent that processes CVs through a mult
 - State flows through nodes, accumulating analysis results and improvements
 
 ### Node Structure (src/cv_agent/nodes/)
-- **parsing.py**: Document parsing (PDF/DOCX/text) � structured sections with LLM enhancement
+- **parsing.py**: Document parsing (PDF/DOCX/text) → structured sections with LLM enhancement
 - **analysis.py**: Quality scoring and requirement matching
-- **improvement.py**: LLM-powered enhancement generation and application
+- **improvement.py**: LLM-powered enhancement generation and application (GPT-4.1-mini)
+- **user_interaction.py**: Conversational AI for personalized suggestions
 
 ### Tools (src/cv_agent/tools/)
 - **analyzers.py**: CV scoring algorithms and ATS compatibility checks
-- **parsers.py**: Multi-tiered parsing system (LLM � Docling � Traditional)
+- **parsers.py**: Multi-tiered parsing system (LLM → Docling → Traditional)
+- **user_interaction.py**: Chat-based interaction and personalized suggestion generation
+- **jd_analyzer.py**: Job description parsing, CV matching, and gap analysis
 
 ### Dependencies
 - **LangGraph**: Workflow orchestration
 - **LangSmith**: Optional monitoring and tracing  
 - **LangChain**: LLM integrations (OpenAI/Anthropic/Google)
+- **Streamlit**: Modern web interface for CV processing
 - **Docling**: Advanced document parsing with OCR and structure detection
 - **PyPDF2/python-docx**: Traditional document parsing fallbacks
 
 ### LLM-Enhanced Section Parsing
 The system uses a three-tier parsing approach for maximum accuracy:
 
-1. **LLM Parsing (Primary)**: Uses GPT-4o-mini with structured output to intelligently identify CV sections
+1. **LLM Parsing (Primary)**: Uses GPT-4.1-mini with structured output to intelligently identify CV sections
    - Handles non-standard section names (e.g., "Professional Journey" → "experience")  
    - Better understanding of context and content grouping
    - Higher confidence scores for accurately identified sections
@@ -78,6 +85,29 @@ The system uses a three-tier parsing approach for maximum accuracy:
 3. **Traditional Parsing (Fallback)**: Regex-based pattern matching
    - Reliable baseline with standard CV section patterns
    - No external dependencies required
+
+### Streamlit Web Interface
+The modern web interface provides comprehensive CV improvement functionality:
+
+**Core Features:**
+- **Multi-tab Organization**: Analysis, Chat Enhancement, Job Matching, Before/After, Final Results
+- **Interactive Chat**: Personalized improvement suggestions through conversational AI
+- **Job Description Matching**: Upload and analyze job descriptions against CV
+- **Before/After Comparison**: Visual side-by-side CV comparison with change analysis
+- **Real-time Processing**: Live feedback and progress updates
+
+**Interface Components:**
+- **Upload Interface**: Support for PDF, DOCX, text files, and sample CVs
+- **Analysis Dashboard**: Comprehensive scoring breakdown and gap identification
+- **Chat Interface**: Intelligent conversation flow for gathering user context
+- **JD Analyzer**: Job description parsing and CV matching analysis
+- **Comparison Views**: Multiple viewing modes for before/after analysis
+
+**Key Functions in streamlit_app.py:**
+- `display_cv_before_after_comparison()`: Multi-tab comparison interface
+- `display_chat_interface()`: Interactive conversation management
+- `display_jd_interface()`: Job description analysis workflow
+- `generate_personalized_suggestions()`: Context-aware improvement generation
 
 **Usage Examples:**
 ```python
@@ -148,8 +178,11 @@ make test-coverage
 
 ## Project Structure Notes
 
-- Entry point: `main.py` (interactive CLI demo)
-- Package structure: `src/cv_agent/` with clear module separation
-- Uses uv for dependency management (see pyproject.toml)
-- Comprehensive test suite with 88 tests and 67% coverage
-- Environment variables managed via python-dotenv
+- **CLI Entry Point**: `main.py` (interactive CLI demo)
+- **Web Entry Point**: `streamlit_app.py` (modern web interface)
+- **Package Structure**: `src/cv_agent/` with clear module separation
+- **Dependency Management**: uv for Python packages (see pyproject.toml)
+- **Testing**: Comprehensive test suite with 88 tests and 67% coverage
+- **Configuration**: Environment variables managed via python-dotenv
+- **Model**: Default GPT-4.1-mini across all components
+- **Interface Types**: Both CLI and web-based Streamlit interface available

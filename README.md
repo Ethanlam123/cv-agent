@@ -4,12 +4,16 @@ An intelligent CV/resume improvement agent built with LangGraph and LangSmith th
 
 ## Features
 
-- **Multi-format Support**: Parse PDFs, DOCX, and text files
+- **Multi-format Support**: Parse PDFs, DOCX, and text files with advanced parsing options
 - **Comprehensive Analysis**: Content quality scoring and ATS compatibility checking  
 - **Smart Improvements**: AI-powered enhancement suggestions with confidence scores
 - **Industry Targeting**: Role and industry-specific optimization
+- **Interactive Chat Interface**: Personalized CV improvement through conversational AI
+- **Job Description Matching**: Analyze CV compatibility against specific job postings
+- **Before/After Comparison**: Visual comparison of original vs enhanced CVs
+- **Streamlit Web Interface**: Modern web-based interface alongside CLI
 - **LangSmith Integration**: Advanced monitoring and optimization capabilities
-- **Interactive CLI**: User-friendly command-line interface
+- **LLM-Enhanced Parsing**: Three-tier parsing system with GPT-4.1-mini, Docling, and traditional methods
 
 ## Architecture
 
@@ -21,11 +25,22 @@ Input CV -> Parse Document -> Analyze Content -> Match Requirements -> Generate 
 
 ### Core Components
 
-- **Document Processing**: PDF/DOCX/text parsing with section extraction
+- **Document Processing**: Advanced three-tier parsing (LLM + Docling + Traditional)
 - **Analysis Engine**: Multi-dimensional scoring (ATS, content quality, formatting)
-- **Improvement Generator**: LLM-powered targeted enhancements
+- **Improvement Generator**: LLM-powered targeted enhancements with GPT-4.1-mini
+- **Interactive Chat**: Personalized suggestion generation through conversation
+- **Job Description Analyzer**: CV-to-JD matching and gap analysis
 - **State Management**: Comprehensive workflow state tracking
+- **Web Interface**: Streamlit-based modern UI with tabbed organization
 - **Monitoring**: LangSmith integration for performance tracking
+
+### Parsing System
+
+The system employs a sophisticated three-tier parsing approach:
+
+1. **LLM Parsing (Primary)**: GPT-4.1-mini with structured output for intelligent section identification
+2. **Docling Parsing (Secondary)**: Advanced document processing with OCR and layout detection
+3. **Traditional Parsing (Fallback)**: Regex-based pattern matching for reliability
 
 ## Quick Start
 
@@ -55,8 +70,14 @@ uv sync
 
 3. Run the agent:
 
+**CLI Interface:**
 ```bash
 python main.py
+```
+
+**Web Interface (Streamlit):**
+```bash
+streamlit run streamlit_app.py
 ```
 
 ### Environment Variables
@@ -75,6 +96,17 @@ ANTHROPIC_API_KEY=your_key_here  # Alternative LLM
 ```
 
 ## Usage
+
+### Web Interface (Streamlit)
+
+The modern web interface provides:
+
+1. **CV Upload**: File upload, text input, or sample CV
+2. **Analysis Dashboard**: Comprehensive scoring and gap identification
+3. **Interactive Chat**: Personalized improvement suggestions through conversation
+4. **Job Matching**: Upload job descriptions for targeted optimization
+5. **Before/After Comparison**: Visual comparison with detailed change analysis
+6. **Enhanced Results**: Download improved CV content
 
 ### Command Line Interface
 
@@ -166,10 +198,10 @@ When LangSmith is configured, the agent automatically tracks:
 
 ### Model Settings
 
-Customize in `.env`:
+The system now uses GPT-4.1-mini by default. Customize in `.env`:
 
 ```bash
-MODEL_NAME=gpt-4o          # LLM model
+MODEL_NAME=gpt-4.1-mini    # LLM model (default)
 MODEL_TEMPERATURE=0.3      # Creativity level
 MAX_TOKENS=2000           # Response length
 ```
